@@ -13,6 +13,8 @@ python setup.py install
 cd test
 dingpa_crawl.py test.conf
 
+and crawled info are stored in crawler.db which is a sqlite db
+
 # Config File Format
 
 Please see test/test.conf
