@@ -13,8 +13,9 @@ python setup.py install
 cd test
 dingpa_crawl.py test.conf
 
-and crawled info are stored in crawler.db which is a sqlite db
-
+and crawled info are stored in crawler.db which is a sqlite3 db. In Mac, you can use
+ SQLiteStudio to view the crawler.db
+ 
 ## Config File Format
 
 Please see test/test.conf
