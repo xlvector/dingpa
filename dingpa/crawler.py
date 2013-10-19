@@ -1,4 +1,6 @@
 import urllib2, sqlite3, hashlib, re
+import html_parser
+import url_util
 
 def download(url, timeout):
     try:
@@ -12,21 +14,6 @@ def download(url, timeout):
     except socket.timeout:
         return_code = -2
     return (return_code, None)
-
-def extract_links(html):
-    p1 = 0
-    ret = []
-    while True:
-        p1 = html.find('href=\"', p1)
-        if p1 < 0:
-            break
-        p1 += len('href=\"')
-        p2 = html.find('\"', p1)
-        if p2 < 0:
-            break
-        ret.append(html[p1:p2])
-        p1 = p2
-    return ret
 
 def get_url_hash(url):
     return int(hashlib.sha224(url).hexdigest(), 16) % (1 << 63)
@@ -69,9 +56,18 @@ class Crawler:
         self.cursor.execute('create table if not exists urls (id bigint not null, url varchar(255) not null, updated_at timestamp default current_timestamp, primary key (id))')
         self.db.commit()
 
+        self.cursor.execute('create table if not exists link_graph (src_id bigint not null, dst_id bigint not null, anchor_text varchar(255) not null, updated_at timestamp default current_timestamp, primary key (src_id, dst_id))')
+        self.db.commit()
+
     def insert_url(self, url):
         url_id = get_url_hash(url)
-        self.cursor.execute('replace into urls (id, url) values (' + str(url_id) + ', \"' + url + '\")')
+        self.cursor.execute('replace into urls (id, url) values (?, ?)', (url_id, url))
+        self.db.commit()
+
+    def insert_to_link_graph(self, src_url, dst_url, anchor_text):
+        src_id = get_url_hash(src_url)
+        dst_id = get_url_hash(dst_url)
+        self.cursor.execute('replace into link_graph (src_id, dst_id, anchor_text) values (?, ?, ?)', (src_id, dst_id, anchor_text))
         self.db.commit()
 
     def print_urls(self, limit = 10):
@@ -92,27 +88,46 @@ class Crawler:
                 return True
         return False
     
+    def encodeUTF8(self, buf, charset):
+        try:
+            ret = buf.decode(charset).encode('utf-8')
+            return ret
+        except Exception, e:
+            return ''
+
+    def encodeUnicode(self, buf, charset):
+        try:
+            ret = buf.decode(charset)
+            return ret
+        except Exception, e:
+            return ''
+
     def crawl_source(self, seed_urls, update_patterns, oneoff_patterns, limit = 100):
         crawl_queue = [x for x in seed_urls if self.match_patterns(x, update_patterns)]
         visited = set()
         while len(crawl_queue) > 0 and len(visited) < limit:
-            url = crawl_queue.pop(0)
-            url_id = get_url_hash(url)
-            if url_id in visited:
-                continue
-            if self.match_patterns(url, update_patterns) == False:
-                continue
-            code, html = download(url, timeout = 10)
-            if html == None:
-                continue
-            visited.add(url_id)
-            print url, len(visited)
-            sub_urls = extract_links(html)
-            for sub_url in sub_urls:
-                if self.match_patterns(sub_url, update_patterns) or self.match_patterns(sub_url, oneoff_patterns):
-                    self.insert_url(sub_url)
-                    crawl_queue.append(sub_url)
-
+            try:
+                url = crawl_queue.pop(0)
+                url_id = get_url_hash(url)
+                if url_id in visited:
+                    continue
+                if self.match_patterns(url, update_patterns) == False:
+                    continue
+                code, html = download(url, timeout = 10)
+                if html == None:
+                    continue
+                visited.add(url_id)
+                doc = html_parser.HTMLParser(html)
+                print url, len(visited), self.encodeUTF8(doc.title(), doc.charset())
+                for sub_url, anchor_text in doc.links():
+                    sub_url = url_util.combine_url(url, sub_url)
+                    anchor_text = self.encodeUnicode(anchor_text, doc.charset())
+                    if self.match_patterns(sub_url, update_patterns) or self.match_patterns(sub_url, oneoff_patterns):
+                        self.insert_url(sub_url)
+                        self.insert_to_link_graph(url, sub_url, anchor_text)
+                        crawl_queue.append(sub_url)
+            except Exception, e:
+                print e
     def crawl(self):
         for source, seed_urls, updates, oneoffs in self.sources:
             print source, seed_urls, updates, oneoffs
