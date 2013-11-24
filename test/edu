@@ -1,0 +1,14 @@
+#!/bin/bash
+
+dingpa_crawl.py edu.conf edu.db 0 10 &
+dingpa_crawl.py edu.conf edu.db 1 10 &
+dingpa_crawl.py edu.conf edu.db 2 10 &
+dingpa_crawl.py edu.conf edu.db 3 10 &
+dingpa_crawl.py edu.conf edu.db 4 10 &
+dingpa_crawl.py edu.conf edu.db 5 10 &
+dingpa_crawl.py edu.conf edu.db 6 10 &
+dingpa_crawl.py edu.conf edu.db 7 10 &
+dingpa_crawl.py edu.conf edu.db 8 10 &
+dingpa_crawl.py edu.conf edu.db 9 10 &
+
+wait
