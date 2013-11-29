@@ -5,6 +5,7 @@ import html_parser
 import url_util, compress_util
 import gzip
 import cStringIO
+import socket
 
 def download(url, timeout):
     try:
@@ -29,6 +30,11 @@ class Crawler:
         self.total = total
         self.shard = shard
         self.init_crawler_db()
+        self.prev_getaddrinfo = socket.getaddrinfo
+        self.dns_cache = {}
+
+        socket.getaddrinfo = self.getaddrinfo
+
         source = ''
         seed_urls = []
         updates = []
@@ -61,6 +67,14 @@ class Crawler:
                 oneoffs = []
         if source != '':
             self.sources.append((source, seed_urls, updates, oneoffs))
+
+    def getaddrinfo(self, *args):
+        if args in self.dns_cache:
+            return self.dns_cache[args]
+        else:
+            res = self.prev_getaddrinfo(*args)
+            self.dns_cache[args] = res
+            return res
 
     def get_crawled_urls(self):
         self.cursor.execute('select src_id from link_graph')
@@ -125,15 +139,8 @@ class Crawler:
             if self.match_single_pattern(url, pattern):
                 return True
         return False
-    
-    def encodeUTF8(self, buf, charset):
-        try:
-            ret = buf.decode(charset).encode('utf-8')
-            return ret
-        except Exception, e:
-            return ''
 
-    def encodeUnicode(self, buf, charset):
+    def encode_unicode(self, buf, charset):
         try:
             ret = buf.decode(charset)
             return ret
@@ -145,6 +152,7 @@ class Crawler:
         crawl_queue += [x for x in self.get_new_urls()]
         visited = self.get_crawled_urls()
         crawled = 0
+        queue_urls = []
         while len(crawl_queue) > 0 and crawled < limit:
             try:
                 url = crawl_queue.pop(0)
@@ -155,26 +163,26 @@ class Crawler:
                     continue
                 if self.match_patterns(url, update_patterns) == False:
                     continue
-                code, html = download(url, timeout = 10)
+                code, html = download(url, timeout = 5)
                 if html == None:
                     continue
                 self.insert_url(url, html)
                 visited.add(url_id)
                 crawled += 1
+                if crawled % 10 == 0:
+                    print crawled, url
                 doc = html_parser.HTMLParser(html)
-                
-                print url, crawled, self.encodeUTF8(doc.title(), doc.charset())
                 for sub_url, anchor_text in doc.links():
                     sub_url = sub_url.strip(' \'')
                     sub_url = url_util.combine_url(url, sub_url)
-                    anchor_text = self.encodeUnicode(anchor_text, doc.charset())
+                    anchor_text = self.encode_unicode(anchor_text, doc.charset())
                     if self.match_patterns(sub_url, update_patterns) or self.match_patterns(sub_url, oneoff_patterns):
                         self.insert_to_link_graph(url, sub_url, anchor_text)
                         self.insert_url(sub_url, None)
                         crawl_queue.append(sub_url)
             except Exception, e:
-                print e
+                continue
+
     def crawl(self):
         for source, seed_urls, updates, oneoffs in self.sources:
-            print source, seed_urls, updates, oneoffs
             self.crawl_source(seed_urls, updates, oneoffs)
