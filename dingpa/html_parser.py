@@ -80,6 +80,9 @@ class HTMLNode:
             ret.append(tk)
         return ret
 
+    def params(self):
+        return self._params
+
     def parse_start_tag(self):
         buf = self._html.strip('<>')
         tks = self.split(buf)
@@ -95,23 +98,26 @@ class HTMLNode:
 
 class HTMLParser:
     def __init__(self, html):
-        self.nodes = self.tokenize(html)
+        self._nodes = self.tokenize(html)
         self._links = []
         self._title = ''
         self._charset = 'utf-8'
         self.build_dom()
 
+    def nodes(self):
+        return self._nodes
+
     def links(self):
         return self._links
 
     def print_nodes(self):
-        for node in self.nodes:
+        for node in self._nodes:
             if node.is_start_tag():
                 print node.tag()
     
     def clean_html(self):
         ret = ''
-        for node in self.nodes:
+        for node in self._nodes:
             if node.valid() == 1:
                 ret += node.html() + ' '
         return ret
@@ -119,11 +125,11 @@ class HTMLParser:
     def text(self):
         ret = ''
         i = -1
-        while i < len(self.nodes):
+        while i < len(self._nodes):
             i += 1
-            if i >= len(self.nodes):
+            if i >= len(self._nodes):
                 break
-            node = self.nodes[i]
+            node = self._nodes[i]
             if node.is_close_tag():
                 continue
             elif node.is_start_tag():
@@ -140,10 +146,10 @@ class HTMLParser:
         return ret
 
     def build_dom(self):
-        for i in range(len(self.nodes)):
-            self.nodes[i].set_index(i)
+        for i in range(len(self._nodes)):
+            self._nodes[i].set_index(i)
         stack = []
-        for node in self.nodes:
+        for node in self._nodes:
             if node.tag() == 'meta':
                 content = node.attr('content')
                 if content == None:
