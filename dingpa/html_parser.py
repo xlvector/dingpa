@@ -64,6 +64,14 @@ class HTMLNode:
         else:
             return False
 
+    def is_tag(self):
+        if len(self._html) == 0:
+            return False
+        if self._html[0] == '<':
+            return True
+        else:
+            return False
+
     def split(self, buf):
         n = 0
         tk = ''
@@ -103,6 +111,34 @@ class HTMLParser:
         self._title = ''
         self._charset = 'utf-8'
         self.build_dom()
+
+    def inner_text(self, k):
+        i = k - 1
+        ret = ''
+        while i <= self._nodes[k].get_end_tag_index():
+            i += 1
+            if self._nodes[i].is_tag():
+                continue
+            else:
+                ret += self._nodes[i].html()
+        return ret
+
+    def get_elements_by_attributes(self, search_attr, expect_value):
+        ret = []
+        for i in range(len(self._nodes)):
+            node = self._nodes[i]
+            value = node.attr(search_attr)
+            if search_attr == 'tag' and node.is_start_tag():
+                value = node.tag()
+            if value != None and value == expect_value:
+                ret.append(i)
+        return ret
+
+    def node(self, i):
+        if i < 0 or i >= len(self._nodes):
+            return None
+        else:
+            return self._nodes[i]
 
     def nodes(self):
         return self._nodes
