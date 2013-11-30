@@ -36,4 +36,9 @@ Following is a sample config
 	update = http://[a-z0-9]+.[a-z0-9]+.edu.cn/.*htm
 	update = http://[a-z0-9]+.[a-z0-9]+.edu.cn/.*html
 
-Here, edu is a group name of pages. url define seed urls. update define rules which use regex to filter pages you want to crawl.
+	[gov]
+
+	url = http://www.gov.cn
+	update = http://www.gov.cn/[a-z0-9]+/
+
+Here, edu, gov is a group name of pages. url define seed urls. update define rules which use regex to filter pages you want to crawl.
