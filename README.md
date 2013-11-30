@@ -8,20 +8,22 @@ python web crawler with rich config file
 
 Before install, you may want to run unittest. You can do it by
 
-python unittest/unittest_all.py
+	python unittest/unittest_all.py
 
 
 ## Install
 
-python setup.py install
+   python setup.py install
 
 ## Run
 
-cd test
-dingpa_crawl.py test.conf
+	dingpa_crawl.py [config_file_name] [db_prefix] [shard] [total]
 
-and crawled info are stored in crawler.db which is a sqlite3 db. In Mac, you can use
- SQLiteStudio to view the crawler.db
+	e.g.
+
+	dingpa_crawl.py test.conf test.db 1 10
+
+The example command will use test.conf as config file, and save data in test.db.10.1. Here the shard/total is for sharding. And example command will only crawl urls whose hash mod 10 equals 1.
  
 ## Config File Format
 
