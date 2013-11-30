@@ -13,7 +13,7 @@ Before install, you may want to run unittest. You can do it by
 
 ## Install
 
-   python setup.py install
+	python setup.py install
 
 ## Run
 
