@@ -6,10 +6,17 @@ import url_util, compress_util
 import gzip
 import cStringIO
 import socket
+import random
+
+def random_ip():
+    return '.'.join([str(random.randint(23, 179)) for i in range(4)])
 
 def download(url, timeout):
+    headers = {'Referer': url, \
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.57 Safari/537.36',\
+            'X-Forwarded-For' : random_ip()}
     try:
-        request = urllib2.Request(url)
+        request = urllib2.Request(url = url, headers = headers)
         response = urllib2.urlopen(request, timeout = timeout)
         return (200, response.read())
     except urllib2.HTTPError, e:

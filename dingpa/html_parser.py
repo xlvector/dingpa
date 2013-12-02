@@ -94,6 +94,8 @@ class HTMLNode:
     def parse_start_tag(self):
         buf = self._html.strip('<>')
         tks = self.split(buf)
+        if len(tks) == 0:
+            return
         self._tag = tks[0]
         self._params = {}
         for tk in tks:
@@ -123,9 +125,16 @@ class HTMLParser:
                 ret += self._nodes[i].html()
         return ret
 
-    def get_elements_by_attributes(self, search_attr, expect_value):
+    def get_elements_by_attributes(self, search_attr, expect_value, within_node_index = -1):
+        begin_index = 0
+        end_index = len(self._nodes)
+
+        if within_node_index >= 0 and within_node_index < end_index:
+            begin_index = within_node_index
+            end_index = self.node(begin_index).get_end_tag_index()
+
         ret = []
-        for i in range(len(self._nodes)):
+        for i in range(begin_index, end_index):
             node = self._nodes[i]
             value = node.attr(search_attr)
             if search_attr == 'tag' and node.is_start_tag():
