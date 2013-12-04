@@ -185,7 +185,8 @@ class Crawler:
                     if self.match_patterns(sub_url, update_patterns) or self.match_patterns(sub_url, oneoff_patterns):
                         self.insert_to_link_graph(url, sub_url, anchor_text)
                         self.insert_url(sub_url, None)
-                        crawl_queue.append(sub_url)
+                        if get_url_hash(sub_url) % self.total == self.shard:
+                            crawl_queue.append(sub_url)
             except Exception, e:
                 continue
 
