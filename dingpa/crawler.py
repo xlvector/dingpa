@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import urllib2, sqlite3, hashlib, re, random
+import urllib2, sqlite3, hashlib, re, random, os
 import html_parser
 import url_util, compress_util
 import gzip
@@ -155,6 +155,7 @@ class Crawler:
             return ''
 
     def crawl_source(self, seed_urls, update_patterns, oneoff_patterns, limit = 500):
+        pid = os.getpid()
         crawl_queue = [x for x in seed_urls if self.match_patterns(x, update_patterns)]
         crawl_queue += [x for x in self.get_new_urls()]
         visited = self.get_crawled_urls()
@@ -176,7 +177,7 @@ class Crawler:
                 self.insert_url(url, html)
                 visited.add(url_id)
                 crawled += 1
-                print crawled, len(crawl_queue), url
+                print pid, crawled, len(crawl_queue), url
                 doc = html_parser.HTMLParser(html)
                 for sub_url, anchor_text in doc.links():
                     sub_url = sub_url.strip(' \'')
