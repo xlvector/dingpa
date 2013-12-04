@@ -161,6 +161,7 @@ class Crawler:
         visited = self.get_crawled_urls()
         crawled = 0
         queue_urls = []
+        print pid, crawled, len(crawl_queue)
         while len(crawl_queue) > 0 and crawled < limit:
             try:
                 url = crawl_queue.pop(0)
@@ -192,6 +193,7 @@ class Crawler:
                 print 'exception', pid
                 print e
                 continue
+        print pid, crawled, len(crawl_queue)
 
     def crawl(self):
         for source, seed_urls, updates, oneoffs in self.sources:
