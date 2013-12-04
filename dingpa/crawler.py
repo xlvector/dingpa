@@ -176,8 +176,7 @@ class Crawler:
                 self.insert_url(url, html)
                 visited.add(url_id)
                 crawled += 1
-                if crawled % 10 == 0:
-                    print crawled, url
+                print crawled, len(crawl_queue), url
                 doc = html_parser.HTMLParser(html)
                 for sub_url, anchor_text in doc.links():
                     sub_url = sub_url.strip(' \'')
