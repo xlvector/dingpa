@@ -189,6 +189,8 @@ class Crawler:
                         if get_url_hash(sub_url) % self.total == self.shard:
                             crawl_queue.append(sub_url)
             except Exception, e:
+                print 'exception', pid
+                print e
                 continue
 
     def crawl(self):
