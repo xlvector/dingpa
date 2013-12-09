@@ -113,6 +113,7 @@ class HTMLParser:
         self._title = ''
         self._charset = 'utf-8'
         self.build_dom()
+        self._delete_chars = set(['<', '>', '[', ']', '-', '!'])
 
     def inner_text(self, k):
         i = k - 1
@@ -167,6 +168,14 @@ class HTMLParser:
                 ret += node.html() + ' '
         return ret
 
+    def clean_text(self, buf):
+        ret = ''
+        for ch in buf:
+            if ch in self._delete_chars:
+                continue
+            ret += ch
+        return ret
+
     def text(self):
         ret = ''
         i = -1
@@ -187,7 +196,7 @@ class HTMLParser:
             else:
                 buf = node.html().strip()
                 if len(buf) > 0:
-                    ret += buf + '\n'
+                    ret += self.clean_text(buf) + '\n'
         return ret
 
     def build_dom(self):

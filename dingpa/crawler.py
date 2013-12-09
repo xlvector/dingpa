@@ -18,7 +18,11 @@ def download(url, timeout):
     try:
         request = urllib2.Request(url = url, headers = headers)
         response = urllib2.urlopen(request, timeout = timeout)
-        return (200, response.read())
+        content_type = response.info()['Content-Type']
+        if content_type == None or content_type.find('text/html') < 0:
+            return (-3, None)
+        else:
+            return (200, response.read())
     except urllib2.HTTPError, e:
         return_code = e.getcode()
     except urllib2.URLError, e:
@@ -74,6 +78,7 @@ class Crawler:
                 oneoffs = []
         if source != '':
             self.sources.append((source, seed_urls, updates, oneoffs))
+
 
     def getaddrinfo(self, *args):
         if args in self.dns_cache:
@@ -184,6 +189,7 @@ class Crawler:
                     sub_url = sub_url.strip(' \'')
                     sub_url = url_util.combine_url(url, sub_url)
                     anchor_text = self.encode_unicode(anchor_text, doc.charset())
+
                     if self.match_patterns(sub_url, update_patterns) or self.match_patterns(sub_url, oneoff_patterns):
                         self.insert_to_link_graph(url, sub_url, anchor_text)
                         self.insert_url(sub_url, None)
