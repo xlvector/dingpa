@@ -38,6 +38,7 @@ class Crawler:
     def __init__(self, config, db_name, shard, total):
         self.db_root = db_name + '.' + str(total) 
         self.db_name = db_name + '.' + str(total) + '.' + str(shard)
+        self.writer = open(self.db_name.replace('.db', '.out'), 'w')
         self.total = total
         self.shard = shard
         self.init_crawler_db()
@@ -111,7 +112,7 @@ class Crawler:
     def init_crawler_db(self):
         self.db = sqlite3.connect(self.db_name)
         self.cursor = self.db.cursor()
-        self.cursor.execute('create table if not exists urls (id bigint not null, url varchar(255) not null, html blob, updated_at timestamp default current_timestamp, primary key (id))')
+        self.cursor.execute('create table if not exists urls (id bigint not null, url varchar(255) not null, updated_at timestamp default current_timestamp, primary key (id))')
         self.db.commit()
 
         self.cursor.execute('create table if not exists link_graph (src_id bigint not null, dst_id bigint not null, anchor_text varchar(255) not null, updated_at timestamp default current_timestamp, primary key (src_id, dst_id))')
@@ -121,12 +122,10 @@ class Crawler:
 
     def insert_url(self, url, html):
         url_id = get_url_hash(url)
-        if html != None:
-            if len(html) < 1500000:
-                self.cursor.execute('replace into urls (id, url, html) values (?, ?, ?)', (url_id, url, sqlite3.Binary(compress_util.compress(html))))
-        else:
-            self.cursor.execute('insert or ignore into urls (id, url) values (?, ?)', (url_id, url))
+        self.cursor.execute('insert or ignore into urls (id, url) values (?, ?)', (url_id, url))
         self.db.commit()
+        if html != None:
+            self.writer.write(str(url_id) + '\t' + compress_util.compress(html) + '\n')
 
     def insert_to_link_graph(self, src_url, dst_url, anchor_text):
         src_id = get_url_hash(src_url)
@@ -204,3 +203,4 @@ class Crawler:
     def crawl(self):
         for source, seed_urls, updates, oneoffs in self.sources:
             self.crawl_source(seed_urls, updates, oneoffs)
+        self.writer.close()
