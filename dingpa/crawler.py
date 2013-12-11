@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import urllib2, sqlite3, hashlib, re, random, os
+import urllib2, hashlib, re, random, os, time, traceback, httplib
+from CodernityDB.database import Database
 import html_parser
 import url_util, compress_util
 import gzip
@@ -20,28 +21,33 @@ def download(url, timeout):
         response = urllib2.urlopen(request, timeout = timeout)
         content_type = response.info()['Content-Type']
         if content_type == None or content_type.find('text/html') < 0:
-            return (-3, None)
+            return ('none_html', None)
         else:
             return (200, response.read())
     except urllib2.HTTPError, e:
         return_code = e.getcode()
     except urllib2.URLError, e:
-        return_code = -1
+        return_code = 'URLError'
     except socket.timeout:
-        return_code = -2
+        return_code = 'timeout'
+    except httplib.BadStatusLine:
+        return_code = 'BadStatusLine'
     return (return_code, None)
 
 def get_url_hash(url):
     return int(hashlib.sha224(url).hexdigest(), 16) % (1 << 63)
 
 class Crawler:
-    def __init__(self, config, db_name, shard, total):
-        self.db_root = db_name + '.' + str(total) 
-        self.db_name = db_name + '.' + str(total) + '.' + str(shard)
-        self.writer = open(self.db_name.replace('.db', '.out'), 'w')
+    def __init__(self, config, name, shard, total):
+        self.name = name
+        self.db = Database(name + '.' + str(total) + '.' + str(shard) + '.db')
+        if self.db.exists():
+            self.db.open()
+        else:
+            self.db.create()
+        self.docs = {}
         self.total = total
         self.shard = shard
-        self.init_crawler_db()
         self.prev_getaddrinfo = socket.getaddrinfo
         self.dns_cache = {}
 
@@ -90,53 +96,40 @@ class Crawler:
             return res
 
     def get_crawled_urls(self):
-        self.cursor.execute('select src_id from link_graph')
         ret = set()
-        for uid, in self.cursor.fetchall():
-            ret.add(uid)
+        for doc in self.db.all('id'):
+            if doc['html'] != '':
+                ret.add(doc['id'])
         return ret
 
     def get_new_urls(self):
         ret = set()
 
+        for doc in self.db.all('id'):
+            if doc['html'] == '' and doc['id'] % self.total == self.shard:
+                ret.add(doc['url'])
+
         for i in range(self.total):
-            db = sqlite3.connect(self.db_root + '.' + str(i))
-            db.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
-            cursor = db.cursor()
-            cursor.execute('select id, url from urls')
-            for uid, url in cursor.fetchall():
-                if uid % self.total == self.shard:
-                    ret.add(url)
+            if i == self.shard:
+                continue
+            db = Database(self.name + '.' + str(self.total) + '.' + str(i) + '.db')
+            if db.exists():
+                db.open()
+            else:
+                continue
+            for doc in db.all('id'):
+                if len(doc['html']) == 0 and doc['id'] % self.total == self.shard:
+                    ret.add(doc['url'])
         return ret
-
-    def init_crawler_db(self):
-        self.db = sqlite3.connect(self.db_name)
-        self.cursor = self.db.cursor()
-        self.cursor.execute('create table if not exists urls (id bigint not null, url varchar(255) not null, updated_at timestamp default current_timestamp, primary key (id))')
-        self.db.commit()
-
-        self.cursor.execute('create table if not exists link_graph (src_id bigint not null, dst_id bigint not null, anchor_text varchar(255) not null, updated_at timestamp default current_timestamp, primary key (src_id, dst_id))')
-        self.db.commit()
-
-        self.db.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
 
     def insert_url(self, url, html):
         url_id = get_url_hash(url)
-        self.cursor.execute('insert or ignore into urls (id, url) values (?, ?)', (url_id, url))
-        self.db.commit()
-        if html != None:
-            self.writer.write(str(url_id) + '\t' + compress_util.compress(html) + '\n')
-
-    def insert_to_link_graph(self, src_url, dst_url, anchor_text):
-        src_id = get_url_hash(src_url)
-        dst_id = get_url_hash(dst_url)
-        self.cursor.execute('replace into link_graph (src_id, dst_id, anchor_text) values (?, ?, ?)', (src_id, dst_id, anchor_text))
-        self.db.commit()
-
-    def print_urls(self, limit = 10):
-        self.cursor.execute('select * from urls limit ' + str(limit))
-        for e in self.cursor.fetchall():
-            print e
+        doc = {'url': url, 'html': compress_util.compress(html), 'id': url_id, 'updated_at': time.time()}
+        if html == None or html == '':
+            if url_id not in self.docs:
+                self.docs[url_id] = doc
+        else:
+            self.docs[url_id] = doc
             
     def match_single_pattern(self, url, pattern):
         match = re.match(pattern, url)
@@ -156,51 +149,60 @@ class Crawler:
             ret = buf.decode(charset)
             return ret
         except Exception, e:
+            print e
             return ''
 
     def crawl_source(self, seed_urls, update_patterns, oneoff_patterns, limit = 500):
         pid = os.getpid()
+
         crawl_queue = [x for x in seed_urls if self.match_patterns(x, update_patterns)]
         crawl_queue += [x for x in self.get_new_urls()]
         visited = self.get_crawled_urls()
         crawled = 0
         queue_urls = []
         print pid, crawled, len(crawl_queue)
+        code_count = {}
         while len(crawl_queue) > 0 and crawled < limit:
-            try:
-                url = crawl_queue.pop(0)
-                url_id = get_url_hash(url)
-                if url_id % self.total != self.shard:
-                    continue
-                if url_id in visited:
-                    continue
-                if self.match_patterns(url, update_patterns) == False:
-                    continue
-                code, html = download(url, timeout = 5)
-                if html == None:
-                    continue
-                self.insert_url(url, html)
-                visited.add(url_id)
-                crawled += 1
-                print pid, crawled, len(crawl_queue), url
-                doc = html_parser.HTMLParser(html)
-                for sub_url, anchor_text in doc.links():
-                    sub_url = sub_url.strip(' \'')
-                    sub_url = url_util.combine_url(url, sub_url)
-                    anchor_text = self.encode_unicode(anchor_text, doc.charset())
-
-                    if self.match_patterns(sub_url, update_patterns) or self.match_patterns(sub_url, oneoff_patterns):
-                        self.insert_to_link_graph(url, sub_url, anchor_text)
-                        self.insert_url(sub_url, None)
-                        if get_url_hash(sub_url) % self.total == self.shard:
-                            crawl_queue.append(sub_url)
-            except Exception, e:
-                print 'exception', pid
-                print e
+            #try:
+            url = crawl_queue.pop(0)
+            url_id = get_url_hash(url)
+            if url_id % self.total != self.shard:
                 continue
+            if url_id in visited:
+                continue
+            if self.match_patterns(url, update_patterns) == False:
+                continue
+            code, html = download(url, timeout = 5)
+            if code not in code_count:
+                code_count[code] = 1
+            else:
+                code_count[code] += 1
+            if html == None:
+                continue
+            self.insert_url(url, html)
+            visited.add(url_id)
+            crawled += 1
+            print pid, crawled, len(crawl_queue), url
+            doc = html_parser.HTMLParser(html)
+            for sub_url, anchor_text in doc.links():
+                sub_url = sub_url.strip(' \'')
+                sub_url = url_util.combine_url(url, sub_url)
+                anchor_text = self.encode_unicode(anchor_text, doc.charset())
+
+                if self.match_patterns(sub_url, update_patterns) or self.match_patterns(sub_url, oneoff_patterns):
+                    self.insert_url(sub_url, '')
+                    if get_url_hash(sub_url) % self.total == self.shard:
+                        crawl_queue.append(sub_url)
+            #except Exception, e:
+            #    print 'exception', pid
+            #    print e
+            #    continue
         print pid, crawled, len(crawl_queue)
+        print code_count
 
     def crawl(self):
         for source, seed_urls, updates, oneoffs in self.sources:
             self.crawl_source(seed_urls, updates, oneoffs)
-        self.writer.close()
+            for uid, doc in self.docs.items():
+                self.db.insert(doc)
+        self.db.close()
