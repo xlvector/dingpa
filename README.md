@@ -44,3 +44,9 @@ Following is a sample config
 	update = http://www.gov.cn/[a-z0-9]+/
 
 Here, edu, gov is a group name of pages. url define seed urls. update define rules which use regex to filter pages you want to crawl.
+
+## Storage
+
+dingpa use an embedded db [CodernityDB](http://labs.codernity.com/codernitydb/quick.html) to save downloaded data. We use embedded db instead of file system beacuse using filesystem will generate many small files which is hard to manage.
+
+CodernityDB is a very fast no-sql embedded db for python.
