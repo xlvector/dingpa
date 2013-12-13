@@ -163,40 +163,40 @@ class Crawler:
         print pid, crawled, len(crawl_queue)
         code_count = {}
         while len(crawl_queue) > 0 and crawled < limit:
-            #try:
-            url = crawl_queue.pop(0)
-            url_id = get_url_hash(url)
-            if url_id % self.total != self.shard:
-                continue
-            if url_id in visited:
-                continue
-            if self.match_patterns(url, update_patterns) == False:
-                continue
-            code, html = download(url, timeout = 5)
-            if code not in code_count:
-                code_count[code] = 1
-            else:
-                code_count[code] += 1
-            if html == None:
-                continue
-            self.insert_url(url, html)
-            visited.add(url_id)
-            crawled += 1
-            print pid, crawled, len(crawl_queue), url
-            doc = html_parser.HTMLParser(html)
-            for sub_url, anchor_text in doc.links():
-                sub_url = sub_url.strip(' \'')
-                sub_url = url_util.combine_url(url, sub_url)
-                anchor_text = self.encode_unicode(anchor_text, doc.charset())
+            try:
+                url = crawl_queue.pop(0)
+                url_id = get_url_hash(url)
+                if url_id % self.total != self.shard:
+                    continue
+                if url_id in visited:
+                    continue
+                if self.match_patterns(url, update_patterns) == False:
+                    continue
+                code, html = download(url, timeout = 5)
+                if code not in code_count:
+                    code_count[code] = 1
+                else:
+                    code_count[code] += 1
+                if html == None:
+                    continue
+                self.insert_url(url, html)
+                visited.add(url_id)
+                crawled += 1
+                print pid, crawled, len(crawl_queue), url
+                doc = html_parser.HTMLParser(html)
+                for sub_url, anchor_text in doc.links():
+                    sub_url = sub_url.strip(' \'')
+                    sub_url = url_util.combine_url(url, sub_url)
+                    anchor_text = self.encode_unicode(anchor_text, doc.charset())
 
-                if self.match_patterns(sub_url, update_patterns) or self.match_patterns(sub_url, oneoff_patterns):
-                    self.insert_url(sub_url, '')
-                    if get_url_hash(sub_url) % self.total == self.shard:
-                        crawl_queue.append(sub_url)
-            #except Exception, e:
-            #    print 'exception', pid
-            #    print e
-            #    continue
+                    if self.match_patterns(sub_url, update_patterns) or self.match_patterns(sub_url, oneoff_patterns):
+                        self.insert_url(sub_url, '')
+                        if get_url_hash(sub_url) % self.total == self.shard:
+                            crawl_queue.append(sub_url)
+            except Exception, e:
+                print 'exception', pid
+                print e
+                continue
         print pid, crawled, len(crawl_queue)
         print code_count
 
