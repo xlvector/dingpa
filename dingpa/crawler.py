@@ -32,6 +32,8 @@ def download(url, timeout):
         return_code = 'timeout'
     except httplib.BadStatusLine:
         return_code = 'BadStatusLine'
+    except Exception, e:
+        return_code = 'other'
     return (return_code, None)
 
 def get_url_hash(url):
